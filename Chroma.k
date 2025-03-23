@@ -49,15 +49,43 @@ struct LFO : Modifier {
 	}
 };
 
-struct Filter : Stereo::Effect {
-	HPF hpf;
-	LPF lpf;
-	BPF bpf;
+struct CCF : Stereo::Effect {
+	HPF hpf[2];
+	LPF lpf[2];
+	BPF bpf[2];
 	
-	void set(param f, param q){
+	param f = 0;
+	param q = 0;
+	
+	int mode = 0; // 0 = off, 1 = HPF, 2 = LPF, 3 = BPF
+	
+	void set(param frequency, param resonance, int hp, int lp){
+		f = frequency * (10000 - 100) + 100;
+		q = resonance;
+		
+        if (hp && !lp)       // HPF
+            mode = 1;  
+        else if (!hp && lp)  // LPF
+            mode = 2;  
+        else if (hp && lp)   // BPF
+            mode = 3;  
+        else 			     // bypass
+            mode = 0;  
 	}
 	
 	void process(){
+        if (mode == 1) {
+            in.l >> hpf[0](f, q) >> out.l;
+            in.r >> hpf[1](f, q) >> out.r;
+        } else if (mode == 2) {
+            in.l >> lpf[0](f, q) >> out.l;
+            in.r >> lpf[1](f, q) >> out.r;
+        } else if (mode == 3) {
+            in.l >> bpf[0](f, q) >> out.l;
+            in.r >> bpf[1](f, q) >> out.r;
+        } else {
+            in >> out;
+        }
 	}
 };
 
@@ -70,7 +98,6 @@ struct Flanger : Stereo::Effect {
 	signal mod;
 	
 	void set(param rate, param depth) {
-//		param depth = controls[1] / 1000.f;
 		mod = lfo(rate) * depth + depth;
 	}
 
@@ -110,6 +137,7 @@ struct ChromaOsc : Oscillator {
 };
 
 struct Chroma : Stereo::Synth {
+CCF filter;
 Flanger flanger;
 
 	struct ChromaNote : public Mono::Note {
@@ -148,7 +176,7 @@ Flanger flanger;
 	};
 	
 	void process(){
-		// ** SELECT / EDIT OSCILLATOR TABLE **
+		// ** EDIT HARMONIC TABLES **
 		int select = controls[0];  // 0 = tableA, 1 = tableB
 		int edit = controls[1];
 		for (int h = 0; h < N_HARMONICS; h++) {
@@ -163,9 +191,14 @@ Flanger flanger;
 			}	
 		}
 		
-		// ** MIXER **
+		// ** FILTER **
+		filter.set(controls[23], controls[25], controls[20], controls[21]);
+		in >> filter >> in;
+		
+		// ** EFFECTS **
 		stereo::signal wet = in;
 		
+		// ** FLANGER
 		flanger.set(controls[41], controls[42] / 1000.f);
 		int flange = controls[40];
 		if (flange)
@@ -174,7 +207,7 @@ Flanger flanger;
 		// ** OUT **
 		param mix = controls[49];
 		param volume = controls[50];
-		( wet * mix + in * (1 - mix) ) * volume >> out;
+		(wet * mix + in * (1 - mix)) * volume >> out;
 	}
 
 	Chroma() {
@@ -205,7 +238,7 @@ Flanger flanger;
                 Toggle ("HP", 0, { 341, 30, 18, 18 }),               	 // 20 │
                 Toggle ("LP", 0, { 367, 30, 18, 18 }),               	 // 21 │
                 Menu   ("MOD", { 340, 70, 45, 18 }, "ENV", "LFO"),		 // 22 │
-                Dial   ("CUTOFF", 0, 1, 0, { 340, 110, 40, 40 }),    	 // 23 │
+                Dial   ("CUTOFF", 0, 1, 0, { 340, 110, 40, 40 }),  		 // 23 │
                 Dial   ("",       0, 1, 0, { 369, 104, 18, 18 }),    	 // 24 │
                 Dial   ("Q",      0, 1, 0, { 340, 170, 40, 40 }),    	 // 25 │
                 Dial   ("",       0, 1, 0, { 369, 164, 18, 18 }),    	 // 26 └ 
