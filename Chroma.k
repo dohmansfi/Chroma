@@ -2,8 +2,16 @@
 #include <klang.h>
 using namespace klang::optimised;
 
-signal nonlinear(signal x){
+signal cubed(signal x) {
+    return x * x * x;
+}
+
+signal nonlinear(signal x) {
     return pow(10, 2 * (x - 1));
+}
+
+param linearMap(param x, int min, int max) {
+	return x * (max - min) + min;
 }
 
 #define N_HARMONICS 16
@@ -60,8 +68,17 @@ struct CCF : Effect {
 	int mode = 0; // 0 = off, 1 = HPF, 2 = LPF, 3 = BPF
 	
 	void set(param frequency, param resonance, int hp, int lp) {
-		f = frequency * (10000 - 100) + 100;
+		f = linearMap(cubed(frequency), 100, 10000);
+		if (f > 14000)
+            f = 14000;
+        if (f < 20)
+            f = 20;
+            
 		q = resonance;
+		if (q > 2)
+            q = 2;
+        if (q < 0)
+            q = 0;
 		
         if (hp && !lp)       // HPF
             mode = 1;  
@@ -145,8 +162,8 @@ Flanger flanger;
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
 			osc.set(f);
-			adsr(controls[27], controls[27] + controls[28], controls[29], controls[30]);
-			mod(controls[31], controls[31] + controls[32], controls[33], controls[34]);
+			adsr(linearMap(controls[27], 0.005, 1.0), controls[27] + controls[28], controls[29], controls[30]);
+			mod(linearMap(controls[31], 0.005, 1.0), controls[31] + controls[32], controls[33], controls[34]);
 		}
 
 		event off(Amplitude velocity) {
@@ -154,24 +171,25 @@ Flanger flanger;
 		}
 
 		void process() {
-			
-			// ** LFO.set **
-			lfo.set(controls[35] * 8, controls[36] * 2);
-			
-			// ** FILTER **
-			int filterMod = controls[22];
-			if (filterMod)
-				filter.set(controls[23] * lfo * controls[24], controls[25] * lfo * controls[26], controls[20], controls[21]);
-			
-			if (!filterMod)
-				filter.set(controls[23] * mod * controls[24], controls[25] * mod * controls[26], controls[20], controls[21]);
-			
 			// ** MORPH TABLES **
 			int morph = controls[2];
 			if (morph)
 				osc.morph(lfo * controls[3], tableA, tableB);
 			if (!morph)
 				osc.morph(mod * controls[3], tableA, tableB);
+				
+			// ** LFO.set **
+			lfo.set(controls[35] * 8, controls[36] * 2);
+				
+			// ** FILTER **
+			int filterMod = controls[22];
+			param cutoff = controls[23];
+			param q = linearMap(controls[25], 0, 2);
+			if (filterMod)
+				filter.set(cutoff + lfo * controls[24], q + lfo * controls[26], controls[20], controls[21]);
+			
+			if (!filterMod)
+				filter.set(cutoff + mod * controls[24], q + mod * controls[26], controls[20], controls[21]);
 			
 			osc * adsr >> filter >> out;
 			
@@ -240,17 +258,17 @@ Flanger flanger;
                 Toggle ("LP", 0, { 367, 30, 18, 18 }),               	 // 21 │
                 Menu   ("MOD", { 340, 70, 45, 18 }, "ENV", "LFO"),		 // 22 │
                 Dial   ("CUTOFF", 0, 1, 0, { 340, 110, 40, 40 }),  		 // 23 │
-                Dial   ("",       0, 1, 0, { 369, 104, 18, 18 }),    	 // 24 │
+                Dial   ("",       -1, 1, 0, { 369, 104, 18, 18 }),    	 // 24 │
                 Dial   ("Q",      0, 1, 0, { 340, 170, 40, 40 }),    	 // 25 │
-                Dial   ("",       0, 1, 0, { 369, 164, 18, 18 }),    	 // 26 └ 
+                Dial   ("",       -1, 1, 0, { 369, 164, 18, 18 }),    	 // 26 └ 
             },  
                           
-			{ "AMP ENVELOPE   /   MOD ENVELOPE",						 //    ENVELOPES
-                Dial   ("ATTACK",  0.001, 1, 0, { 15,  130, 40, 40 }),	 // 27 ├ AMP
+			{ "AMP   /   MOD",						 					 //    ENVELOPES
+                Dial   ("ATTACK",  0, 1, 0, { 15,  130, 40, 40 }),	 // 27 ├ AMP
                 Dial   ("DECAY",   0.0, 1, 0.5, { 65,  130, 40, 40 }),	 // 28 │ │
                 Dial   ("SUSTAIN", 0, 1, 0.75, { 115, 130, 40, 40 }),	 // 29 │ │
                 Dial   ("RELEASE", 0, 1, 0.5, { 165, 130, 40, 40 }),   	 // 30 │ └
-                Dial   ("", 0.001, 1, 0, { 44,  124, 18, 18 }),          // 31 └ MOD
+                Dial   ("", 0, 1, 0, { 44,  124, 18, 18 }),          // 31 └ MOD
                 Dial   ("", 0.0, 1, 0, { 94, 124, 18, 18 }),        	 // 32   │
                 Dial   ("", 0, 1, 0, { 144, 124, 18, 18 }),          	 // 33   │
                 Dial   ("", 0, 1, 0, { 194, 124, 18, 18 }) 			 	 // 34   └
@@ -268,7 +286,7 @@ Flanger flanger;
                 Toggle ("FLANGER", 0, { 15, 210, 40, 18 }),			 	 // 40 ├ FLANGER
                 Dial   ("", 0.1, 1, 0, { 65, 210, 18, 18 }),			 // 41 │
                 Dial   ("", 0.1, 5, 0, { 88, 210, 18, 18 }),			 // 42 │
-                Toggle ("CHORUS", 0, { 115, 185, 40, 18 }),			 	 // 43 ├ CHORUS
+                Toggle ("GLIMMER", 0, { 115, 185, 40, 18 }),			 	 // 43 ├ CHORUS
                 Dial   ("", 0, 1, 0, { 165, 185, 18, 18 }),			 	 // 44 │
                 Dial   ("", 0, 1, 0, { 188, 185, 18, 18 }),			 	 // 45 │
                 Toggle ("DELAY", 0, { 115, 210, 40, 18 }),			 	 // 46 ├ DELAY
