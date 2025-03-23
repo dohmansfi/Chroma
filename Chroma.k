@@ -73,7 +73,7 @@ struct Chorus : Effect {
 struct Delay : Effect {
 };
 
-struct SpectralOsc : Oscillator {
+struct ChromaOsc : Oscillator {
 	Sine harmonic[N_HARMONICS];
 	param gain[N_HARMONICS];
 	
@@ -97,10 +97,10 @@ struct SpectralOsc : Oscillator {
     }
 };
 
-struct SpectralMorph : Synth {
+struct Chroma : Synth {
 
-	struct SpectralMorphNote : public Note {
-		SpectralOsc osc;
+	struct ChromaNote : public Note {
+		ChromaOsc osc;
         ADSR adsr, mod;
         LFO lfo;
 
@@ -154,7 +154,7 @@ struct SpectralMorph : Synth {
 		in * controls[50] >> out;
 	}
 
-	SpectralMorph() {
+	Chroma() {
 		controls = {
 			/* OSCILLATOR */											 //    OSCILLATOR
                 Menu   ("HARMONICS", { 15, 25, 45, 18 }, "A", "B"),  	 // 00 ├ HARMONIC TABLES
@@ -224,6 +224,6 @@ struct SpectralMorph : Synth {
 		presets = {
 			{ "Preset 1", { 0, 0, 0, 0.725, 0.924, 0.000, 0.814, 0.000, 0.637, 0.000, 0.526, 0.000, 0.432, 0.000, 0.000, 0.673, 0.657, 0.000, 0.000, 1.000, 1, 1, 0.000, 0.000, 0.000, 0.000, 0, 0.100, 0.500, 1.000, 0.500, 0.000, 0.000, 0.000, 0.000, 0.502, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 0.000, 0.762 } },
 		};
-		notes.add<SpectralMorphNote>(32);
+		notes.add<ChromaNote>(32);
 	}
 };
