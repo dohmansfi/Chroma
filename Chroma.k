@@ -65,6 +65,18 @@ struct Vibrato : Effect {
 };
 
 struct Flanger : Effect {
+	Delay<192000> delay;
+	Triangle lfo;
+	signal mod;
+	
+	void set(param rate, param depth) {
+//		param depth = controls[1] / 1000.f;
+		mod = lfo(rate) * depth + depth;
+	}
+
+	void process() {	
+		in + (in >> delay)(mod * fs) >> out;
+	}
 };
 
 struct Chorus : Effect {
@@ -98,6 +110,7 @@ struct ChromaOsc : Oscillator {
 };
 
 struct Chroma : Synth {
+Flanger flanger;
 
 	struct ChromaNote : public Note {
 		ChromaOsc osc;
@@ -137,9 +150,9 @@ struct Chroma : Synth {
 	void process(){
 		// ** SELECT / EDIT OSCILLATOR TABLE **
 		int select = controls[0];  // 0 = tableA, 1 = tableB
-		int mode = controls[1];
+		int edit = controls[1];
 		for (int h = 0; h < N_HARMONICS; h++) {
-			if (!mode) {
+			if (!edit) {
 				select ? tableA.amplitude[h] >> controls[h + 4] : tableB.amplitude[h] >> controls[h + 4];
 			} else {
 				if (select) {
@@ -150,8 +163,16 @@ struct Chroma : Synth {
 			}	
 		}
 		
+		// ** MIXER **
+		signal wet = in;
+		
+		flanger.set(controls[41], controls[42] / 1000.f);
+		int flange = controls[40];
+		if (flange)
+			wet * 0.7 >> flanger >> wet;
+			
 		// ** OUT **
-		in * controls[50] >> out;
+		( wet * controls[49] + in * (1 - controls[49]) ) * controls[50] >> out;
 	}
 
 	Chroma() {
@@ -209,8 +230,8 @@ struct Chroma : Synth {
                 Dial   ("", 0, 1, 0, { 65, 185, 18, 18 }),			 	 // 38 │
                 Dial   ("", 0, 1, 0, { 88, 185, 18, 18 }),			 	 // 39 │
                 Toggle ("FLANGER", 0, { 15, 210, 40, 18 }),			 	 // 40 ├ FLANGER
-                Dial   ("", 0, 1, 0, { 65, 210, 18, 18 }),			 	 // 41 │
-                Dial   ("", 0, 1, 0, { 88, 210, 18, 18 }),			 	 // 42 │
+                Dial   ("", 0.1, 1, 0, { 65, 210, 18, 18 }),			 // 41 │
+                Dial   ("", 0.1, 5, 0, { 88, 210, 18, 18 }),			 // 42 │
                 Toggle ("CHORUS", 0, { 115, 185, 40, 18 }),			 	 // 43 ├ CHORUS
                 Dial   ("", 0, 1, 0, { 165, 185, 18, 18 }),			 	 // 44 │
                 Dial   ("", 0, 1, 0, { 188, 185, 18, 18 }),			 	 // 45 │
