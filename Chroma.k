@@ -14,20 +14,6 @@ param linearMap(param x, int min, int max) {
 	return x * (max - min) + min;
 }
 
-#define N_HARMONICS 16
-
-struct HarmonicTable {
-	float amplitude[N_HARMONICS];
-};
-
-HarmonicTable tableA {
-	{ 1.0, 0.0, 0.6, 0.0, 0.4, 0.0, 0.2, 0.7, 0.1, 0.08, 0.07, 0.05, 0.04, 0.03, 0.02, 0.01 }
-};
-
-HarmonicTable tableB {
-	{ 1.0, 0.6, 0.0, 0.3, 0.0, 0.15, 0.0, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.015, 0.01, 0.005 }
-};
-
 struct LFO : Modifier {
 	Sine sin;
 	Triangle tri;
@@ -119,10 +105,50 @@ struct Flanger : Stereo::Effect {
 	}
 };
 
-struct Chorus : Stereo::Effect {
+struct Glimmer : Stereo::Effect {  //
+Delay<192000> gleam[4];
+Sine gleamMod[2];
+param a;
+param spread;
+
+	signal tap(Delay<192000>& buffer, signal x, param time, param gain) {
+		x >> buffer;
+		return x + buffer(time * fs) * gain;
+	}
+	
+	void set(param amount) {
+		a = amount * 0.5;
+		spread = 0.3 + (amount * 0.8);
+	}
+	
+	void process() {
+		// LFO modulations
+		signal mod1 = gleamMod[0](a * 2, 0);
+		signal mod2 = gleamMod[1](a * 2, 0.25);
+		
+		// short delays with phase inversion
+		signal left  = tap(gleam[0], in.l, (0.04 * spread) + mod1, a * 0.75)
+                     - tap(gleam[1], in.r, (0.05 * spread) + mod2, a * 0.75);
+        signal right = tap(gleam[2], in.r, (0.03 * spread) + mod1, a * 0.75)
+                     - tap(gleam[3], in.l, (0.06 * spread) + mod2, a * 0.75);
+                     
+        in.l + left >> out.l;
+        in.r + right >> out.r;
+	}
 };
 
-struct Delay : Stereo::Effect {
+#define N_HARMONICS 16
+
+struct HarmonicTable {
+	float amplitude[N_HARMONICS];
+};
+
+HarmonicTable tableA {
+	{ 1.0, 0.0, 0.6, 0.0, 0.4, 0.0, 0.2, 0.7, 0.1, 0.08, 0.07, 0.05, 0.04, 0.03, 0.02, 0.01 }
+};
+
+HarmonicTable tableB {
+	{ 1.0, 0.6, 0.0, 0.3, 0.0, 0.15, 0.0, 0.08, 0.06, 0.05, 0.04, 0.03, 0.02, 0.015, 0.01, 0.005 }
 };
 
 struct ChromaOsc : Oscillator {
@@ -150,8 +176,9 @@ struct ChromaOsc : Oscillator {
 };
 
 struct Chroma : Stereo::Synth {
-
 Flanger flanger;
+Glimmer glimmer;
+Stereo::Delay<192000> pingPong;
 
 	struct ChromaNote : public Mono::Note {
 		ChromaOsc osc;
@@ -162,8 +189,8 @@ Flanger flanger;
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
 			osc.set(f);
-			adsr(linearMap(controls[27], 0.005, 1.0), controls[27] + controls[28], controls[29], controls[30]);
-			mod(linearMap(controls[31], 0.005, 1.0), controls[31] + controls[32], controls[33], controls[34]);
+			adsr(controls[27] + 0.005, controls[27] + controls[28], controls[29], controls[30]);
+			mod (controls[31] + 0.005, controls[31] + controls[32], controls[33], controls[34]);
 		}
 
 		event off(Amplitude velocity) {
@@ -218,14 +245,32 @@ Flanger flanger;
 		stereo::signal wet = in;
 		
 		// ** FLANGER
-		flanger.set(controls[41], controls[42] / 1000.f);
-		int flange = controls[40];
+		int flange = controls[37];
+		flanger.set(controls[38], controls[39] / 1000.f);
 		if (flange)
-			wet * 0.7 >> flanger >> wet;
+			wet * 0.75 >> flanger >> wet;
 			
+		// ** GLIMMER **
+		int gleam = controls[40];
+		glimmer.set(controls[41]);
+		if (gleam) {
+			wet * 0.75 >> glimmer >> wet;
+		}
+			
+		// ** DELAY **
+		int delay = controls[42];
+		stereo::signal time = { controls[43], controls[44] };
+		stereo::signal gain = { controls[45], controls[45] };
+		param amount = controls[46] * 0.8;
+		if (delay) {
+			wet + pingPong(time * fs) * gain * amount >> wet;
+			pingPong.l << wet.r;
+			pingPong.r << wet.l;
+		}
+		
 		// ** OUT **
-		param mix = controls[49];
-		param volume = controls[50];
+		param mix = controls[47];
+		param volume = controls[48];
 		(wet * mix + in * (1 - mix)) * volume >> out;
 	}
 
@@ -264,11 +309,11 @@ Flanger flanger;
             },  
                           
 			{ "AMP   /   MOD",						 					 //    ENVELOPES
-                Dial   ("ATTACK",  0, 1, 0, { 15,  130, 40, 40 }),	 // 27 ├ AMP
+                Dial   ("ATTACK",  0, 1, 0, { 15,  130, 40, 40 }),	 	 // 27 ├ AMP
                 Dial   ("DECAY",   0.0, 1, 0.5, { 65,  130, 40, 40 }),	 // 28 │ │
                 Dial   ("SUSTAIN", 0, 1, 0.75, { 115, 130, 40, 40 }),	 // 29 │ │
                 Dial   ("RELEASE", 0, 1, 0.5, { 165, 130, 40, 40 }),   	 // 30 │ └
-                Dial   ("", 0, 1, 0, { 44,  124, 18, 18 }),          // 31 └ MOD
+                Dial   ("", 0, 1, 0, { 44,  124, 18, 18 }),          	 // 31 └ MOD
                 Dial   ("", 0.0, 1, 0, { 94, 124, 18, 18 }),        	 // 32   │
                 Dial   ("", 0, 1, 0, { 144, 124, 18, 18 }),          	 // 33   │
                 Dial   ("", 0, 1, 0, { 194, 124, 18, 18 }) 			 	 // 34   └
@@ -280,24 +325,23 @@ Flanger flanger;
             },   
 					
 			/* MIXER */													 //    EFFECTS
-                Toggle ("VIBRATO", 0, { 15, 185, 40, 18 }),          	 // 37 ├ VIBRATO
-                Dial   ("", 0, 1, 0, { 65, 185, 18, 18 }),			 	 // 38 │
-                Dial   ("", 0, 1, 0, { 88, 185, 18, 18 }),			 	 // 39 │
-                Toggle ("FLANGER", 0, { 15, 210, 40, 18 }),			 	 // 40 ├ FLANGER
+                Toggle ("FLANGER", 0, { 15, 185, 40, 18 }),          	 // 37 ├ FLANGER
+                Dial   ("", 0.1, 1, 0, { 65, 185, 18, 18 }),			 // 38 │
+                Dial   ("", 0.1, 5, 0, { 88, 185, 18, 18 }),			 // 39 │
+                Toggle ("GLIMMER", 0, { 15, 210, 40, 18 }),			 	 // 40 ├ GLIMMER CHORUS
                 Dial   ("", 0.1, 1, 0, { 65, 210, 18, 18 }),			 // 41 │
-                Dial   ("", 0.1, 5, 0, { 88, 210, 18, 18 }),			 // 42 │
-                Toggle ("GLIMMER", 0, { 115, 185, 40, 18 }),			 	 // 43 ├ CHORUS
-                Dial   ("", 0, 1, 0, { 165, 185, 18, 18 }),			 	 // 44 │
-                Dial   ("", 0, 1, 0, { 188, 185, 18, 18 }),			 	 // 45 │
-                Toggle ("DELAY", 0, { 115, 210, 40, 18 }),			 	 // 46 ├ DELAY
-                Dial   ("", 0, 1, 0, { 165, 210, 18, 18 }),			 	 // 47 │
-                Dial   ("", 0, 1, 0, { 188, 210, 18, 18 }),			 	 // 48 │
-                Dial   ("FX", 0, 1, 0, { 239, 205, 24, 23 }),		 	 // 49 └
-                Dial   ("VOLUME", 0, 1.5, 1, { 289, 205, 24, 23 })	 	 // 50 OUT
+                Toggle ("DELAY", 0, { 115, 185, 40, 18 }),			 	 // 42 ├ DELAY
+                Dial   ("", 0, 1, 0, { 165, 185, 18, 18 }),			 	 // 43 │
+                Dial   ("", 0, 1, 0, { 188, 185, 18, 18 }),			 	 // 44 │
+                Dial   ("", 0, 1, 0, { 165, 210, 18, 18 }),			 	 // 45 │
+                Dial   ("", 0, 1, 0, { 188, 210, 18, 18 }),			 	 // 46 │
+                Dial   ("FX", 0, 1, 0, { 239, 205, 24, 23 }),		 	 // 47 └
+                Dial   ("VOLUME", 0, 1.5, 1, { 289, 205, 24, 23 })	 	 // 48 OUT
 		};
 		
 		presets = {
 			{ "Preset 1", { 0, 0, 0, 0.725, 0.924, 0.000, 0.814, 0.000, 0.637, 0.000, 0.526, 0.000, 0.432, 0.000, 0.000, 0.673, 0.657, 0.000, 0.000, 1.000, 1, 1, 0.000, 0.000, 0.000, 0.000, 0, 0.100, 0.500, 1.000, 0.500, 0.000, 0.000, 0.000, 0.000, 0.502, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 1, 0.000, 0.000, 0.000, 0.762 } },
+			{ "Double Attack", { 1, 1, 1, 1.000, 1.000, 0.591, 0.600, 0.000, 0.000, 0.000, 0.200, 0.700, 0.100, 0.080, 0.070, 0.050, 0.040, 0.030, 0.020, 0.010, 0, 1, 0, 0.218, 0.818, 0.000, 0.308, 0.000, 0.348, 0.402, 0.207, 0.000, 0.200, 0.000, 0.000, 1.000, 1.000, 1, 0.447, 1.043, 1, 0.631, 0, 0.309, 0.310, 0.383, 1.000, 1.000, 1.000 } },
 		};
 		notes.add<ChromaNote>(32);
 	}
