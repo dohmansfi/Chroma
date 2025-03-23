@@ -49,7 +49,7 @@ struct LFO : Modifier {
 	}
 };
 
-struct Filter : Effect {
+struct Filter : Stereo::Effect {
 	HPF hpf;
 	LPF lpf;
 	BPF bpf;
@@ -61,11 +61,11 @@ struct Filter : Effect {
 	}
 };
 
-struct Vibrato : Effect {
+struct Vibrato : Stereo::Effect {
 };
 
-struct Flanger : Effect {
-	Delay<192000> delay;
+struct Flanger : Stereo::Effect {
+	Stereo::Delay<192000> delay;
 	Triangle lfo;
 	signal mod;
 	
@@ -79,10 +79,10 @@ struct Flanger : Effect {
 	}
 };
 
-struct Chorus : Effect {
+struct Chorus : Stereo::Effect {
 };
 
-struct Delay : Effect {
+struct Delay : Stereo::Effect {
 };
 
 struct ChromaOsc : Oscillator {
@@ -109,10 +109,10 @@ struct ChromaOsc : Oscillator {
     }
 };
 
-struct Chroma : Synth {
+struct Chroma : Stereo::Synth {
 Flanger flanger;
 
-	struct ChromaNote : public Note {
+	struct ChromaNote : public Mono::Note {
 		ChromaOsc osc;
         ADSR adsr, mod;
         LFO lfo;
@@ -164,7 +164,7 @@ Flanger flanger;
 		}
 		
 		// ** MIXER **
-		signal wet = in;
+		stereo::signal wet = in;
 		
 		flanger.set(controls[41], controls[42] / 1000.f);
 		int flange = controls[40];
@@ -172,7 +172,9 @@ Flanger flanger;
 			wet * 0.7 >> flanger >> wet;
 			
 		// ** OUT **
-		( wet * controls[49] + in * (1 - controls[49]) ) * controls[50] >> out;
+		param mix = controls[49];
+		param volume = controls[50];
+		( wet * mix + in * (1 - mix) ) * volume >> out;
 	}
 
 	Chroma() {
