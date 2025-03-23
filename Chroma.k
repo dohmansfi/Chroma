@@ -41,7 +41,7 @@ struct LFO : Modifier {
         signal triMod = tri(rate) * 0.5 + 0.5;
         signal sawMod = saw(rate) * 0.5 + 0.5;
         signal pseudoSaw = sawMod >> lpf(500);
-;        lfo = (1.0 - blend1) * sinMod + (blend1 - blend2) * triMod + blend2 * pseudoSaw;
+        lfo = (1.0 - blend1) * sinMod + (blend1 - blend2) * triMod + blend2 * pseudoSaw;
 	}
 	
 	void process() {
@@ -49,17 +49,17 @@ struct LFO : Modifier {
 	}
 };
 
-struct CCF : Stereo::Effect {
-	HPF hpf[2];
-	LPF lpf[2];
-	BPF bpf[2];
+struct CCF : Effect {
+	HPF hpf;
+	LPF lpf;
+	BPF bpf;
 	
 	param f = 0;
 	param q = 0;
 	
 	int mode = 0; // 0 = off, 1 = HPF, 2 = LPF, 3 = BPF
 	
-	void set(param frequency, param resonance, int hp, int lp){
+	void set(param frequency, param resonance, int hp, int lp) {
 		f = frequency * (10000 - 100) + 100;
 		q = resonance;
 		
@@ -73,19 +73,15 @@ struct CCF : Stereo::Effect {
             mode = 0;  
 	}
 	
-	void process(){
-        if (mode == 1) {
-            in.l >> hpf[0](f, q) >> out.l;
-            in.r >> hpf[1](f, q) >> out.r;
-        } else if (mode == 2) {
-            in.l >> lpf[0](f, q) >> out.l;
-            in.r >> lpf[1](f, q) >> out.r;
-        } else if (mode == 3) {
-            in.l >> bpf[0](f, q) >> out.l;
-            in.r >> bpf[1](f, q) >> out.r;
-        } else {
+	void process() {
+        if (mode == 1)
+            in >> hpf(f, q) >> out;
+        else if (mode == 2)
+            in >> lpf(f, q) >> out;
+        else if (mode == 3)
+            in >> bpf(f, q) >> out;
+        else
             in >> out;
-        }
 	}
 };
 
@@ -137,13 +133,14 @@ struct ChromaOsc : Oscillator {
 };
 
 struct Chroma : Stereo::Synth {
-CCF filter;
+
 Flanger flanger;
 
 	struct ChromaNote : public Mono::Note {
 		ChromaOsc osc;
         ADSR adsr, mod;
         LFO lfo;
+        CCF filter;
 
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
@@ -161,14 +158,22 @@ Flanger flanger;
 			// ** LFO.set **
 			lfo.set(controls[35] * 8, controls[36] * 2);
 			
+			// ** FILTER **
+			int filterMod = controls[22];
+			if (filterMod)
+				filter.set(controls[23] * lfo * controls[24], controls[25] * lfo * controls[26], controls[20], controls[21]);
+			
+			if (!filterMod)
+				filter.set(controls[23] * mod * controls[24], controls[25] * mod * controls[26], controls[20], controls[21]);
+			
 			// ** MORPH TABLES **
 			int morph = controls[2];
 			if (morph)
-				osc.morph(controls[3] * lfo, tableA, tableB);
+				osc.morph(lfo * controls[3], tableA, tableB);
 			if (!morph)
-				osc.morph(controls[3] * mod, tableA, tableB);
+				osc.morph(mod * controls[3], tableA, tableB);
 			
-			osc * adsr >> out;
+			osc * adsr >> filter >> out;
 			
 			if (adsr.finished())
 				stop();
@@ -190,11 +195,7 @@ Flanger flanger;
 				}
 			}	
 		}
-		
-		// ** FILTER **
-		filter.set(controls[23], controls[25], controls[20], controls[21]);
-		in >> filter >> in;
-		
+
 		// ** EFFECTS **
 		stereo::signal wet = in;
 		
@@ -245,12 +246,12 @@ Flanger flanger;
             },  
                           
 			{ "AMP ENVELOPE   /   MOD ENVELOPE",						 //    ENVELOPES
-                Dial   ("ATTACK",  0.1, 1, 0, { 15,  130, 40, 40 }),	 // 27 ├ AMP
+                Dial   ("ATTACK",  0.001, 1, 0, { 15,  130, 40, 40 }),	 // 27 ├ AMP
                 Dial   ("DECAY",   0.0, 1, 0.5, { 65,  130, 40, 40 }),	 // 28 │ │
                 Dial   ("SUSTAIN", 0, 1, 0.75, { 115, 130, 40, 40 }),	 // 29 │ │
                 Dial   ("RELEASE", 0, 1, 0.5, { 165, 130, 40, 40 }),   	 // 30 │ └
-                Dial   ("", 0, 1, 0, { 44,  124, 18, 18 }),          	 // 31 └ MOD
-                Dial   ("", 0, 1, 0, { 94, 124, 18, 18 }),        	 	 // 32   │
+                Dial   ("", 0.001, 1, 0, { 44,  124, 18, 18 }),          // 31 └ MOD
+                Dial   ("", 0.0, 1, 0, { 94, 124, 18, 18 }),        	 // 32   │
                 Dial   ("", 0, 1, 0, { 144, 124, 18, 18 }),          	 // 33   │
                 Dial   ("", 0, 1, 0, { 194, 124, 18, 18 }) 			 	 // 34   └
             },     	 
