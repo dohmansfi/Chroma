@@ -22,12 +22,25 @@ The synthesiser features three effects, controlled via toggles and dials:
 ### GUI controls
 ![GUI](https://github.com/dohmansfi/Chroma/blob/9a631947deebc5ae26bfba89b5029655f952c4bd/img/GUI.jpg)
 
-1.
-2.
-3.
-4.
-5.
-6.
-7.
-8.
-9.
+1. Edit mode toggle
+2. Table A / B selector
+3. Oscillator mod source
+4. Oscillator mod amount
+5. Envelopes
+6. Flanger - Rate
+7. Flanger - On / Off
+8. Glimmer - On / Off
+9. Glimmer - Amount
+10. Flanger - Depth
+11. Delay - On / Off
+12. Delay - Time (left channel)
+13. Delay - Feedback
+14. Delay - Gain
+15. Delay - Time (right channel)
+16. Dry / Wet
+17. Out volume
+18. LFO controls
+19. Filter controls
+20. Filter modulation source
+21. Filter state switches
+22. Selected harmonic table
