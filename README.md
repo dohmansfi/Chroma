@@ -20,4 +20,4 @@ The synthesiser features three effects, controlled via toggles and dials:
 - Delay: Stereo ping-pong delay with time, feedback, and gain control.
 
 ### GUI controls
-![GUI](https://github.com/dohmansfi/Chroma/tree/47b3421a3c32975f730be9b5a4a83e7e66771241/img)
+![GUI](https://github.com/dohmansfi/Chroma/tree/47b3421a3c32975f730be9b5a4a83e7e66771241/img/GUI.png)
