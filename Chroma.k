@@ -64,16 +64,12 @@ struct CCF : Effect {
 	
 	void set(param frequency, param resonance, int hp, int lp) {
 		f = linearMap(cubed(frequency), 100, 10000);
-		if (f > 14000)  // clamp frequency to a valid audio range
-            f = 14000;
-        if (f < 20)
-            f = 20;
+		if (f > 14000)  f = 14000;  // clamp frequency to a valid audio range
+        if (f < 20)     f = 20;
             
 		q = resonance;
-		if (q > 2)  // clamp resonance to a usable range
-            q = 2;
-        if (q < 0)
-            q = 0;
+		if (q > 2)  q = 2;  // clamp resonance to a usable range
+        if (q < 0)  q = 0;
 		
         if (hp && !lp)       mode = 1;  // high pass
         else if (!hp && lp)  mode = 2;  // low pass
@@ -236,7 +232,7 @@ Stereo::Delay<192000> pingPong;
 	
 	// -- SYNTH PROCESS() --
 	void process(){
-		// reflect table values in the UI - update harmonic table from sliders
+		// reflect table values in the UI / update harmonic table from sliders
 		int select = controls[0];  // 0 = tableA, 1 = tableB
 		int edit = controls[1];
 		for (int h = 0; h < N_HARMONICS; h++) {
