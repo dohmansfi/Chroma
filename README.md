@@ -1,4 +1,4 @@
-# CHROMA
+# CHROMA SYNTH
 
 ### Overivew
 Chroma is a stereo additive synthesiser that blends two user-defined harmonic spectra—Wave A and Wave B—using morphing techniques modulated by an LFO or envelope. The name Chroma references chromaticity: the progression from grayscale to full colour saturation. In this context, it symbolises the sonic transition between two spectral states, offering expressive control through harmonic interpolation. The name reflects both the spectral design and the aesthetic goal of enabling a dynamic timbral palette.
